@@ -7,6 +7,7 @@ const authRouter = require("./routes/auth");
 const profileRouter = require("./routes/profile");
 const requestRouter = require("./routes/request");
 const userRouter = require('./routes/user');
+const paymentRouter = require('./routes/payment');
 const cors = require("cors");
 
 //Creating new (instance of) application of express 

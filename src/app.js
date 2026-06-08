@@ -23,6 +23,10 @@ app.use(cors({
 })
 );
 
+app.use("/payment/webhook",
+  express.raw({ type: "application/json" })
+);
+
 app.use(express.json());
 //Adding cookie parser middleware
 app.use(cookieParser());

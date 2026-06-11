@@ -77,9 +77,9 @@ paymentRouter.post("/payment/webhook", async(req,res)=>{
 // What it contains:
 //a timestamp and one or more cryptographic signatures
 const sig = req.headers['stripe-signature'];
-
+ let event;
   try {
-    const event = stripeInstance.webhooks.constructEvent(
+    event = stripeInstance.webhooks.constructEvent(
       req.body, 
       sig, 
       process.env.STRIPE_WEBHOOK_SECRET

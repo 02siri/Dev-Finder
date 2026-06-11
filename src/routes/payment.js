@@ -164,11 +164,12 @@ const sig = req.headers['stripe-signature'];
 });
 
 paymentRouter.get("/premium/verify", userAuth, async(req,res)=>{
-  const user = req.user;
+  const user = req.user.toJSON();
+  console.log(user.isPremium);
   if(user.isPremium){
-    return res.json({isPremium: true});
+    return res.json({isPremium: true, user});
   }
-  return res.json({isPremium: false});
+  return res.json({isPremium: false, user});
 });
 
 module.exports = paymentRouter;

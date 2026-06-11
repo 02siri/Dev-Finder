@@ -38,8 +38,8 @@ paymentRouter.post("/payment/createProduct", userAuth, async (req, res) => {
       ],
       mode: "payment",
       customer_email: emailId, // prefill email on Stripe's page
-      success_url: `http://localhost:5173/payment-success`,
-      cancel_url: `http://localhost:5173/premium`,
+     success_url: `${process.env.CLIENT_URL}/premium`,
+    cancel_url: `${process.env.CLIENT_URL}/premium`,
     });
 
     // 4. Save Payment record to DB 

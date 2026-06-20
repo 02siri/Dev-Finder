@@ -2,7 +2,7 @@ const socket = require("socket.io");
 const crypto = require("crypto");
 const Chat = require("../models/chat");
 const ConnectionRequest = require("../models/connectionRequest");
-const { timeStamp } = require("console");
+const { socketAuth } = require("../middlewares/auth");
 
 const getSecretRoomId = (userId, targetUserId)=>{
     return crypto
@@ -17,25 +17,37 @@ const initializeSocket = (server) => {
         //config
         cors : {
             origin: "http://localhost:5173",
+            credentials: true, // Crucial for accepting HTTP-only cookies cross-origin
         },
     });
 
+    // Apply JWT token authentication middleware before connection is established
+    io.use(socketAuth);
+
     //Need io to receive the connection
     io.on("connection", (socket)=>{
-        //handle events
+        // At this point, socket.user is populated and verified by the socketAuth middleware
+            //handle events
+        socket.on("joinChat", ({ targetUserId })=>{
+            // Obtain details from the authenticated user session (for security)
+            const userId = socket.user._id.toString();
+            const firstName = socket.user.firstName;
 
-        socket.on("joinChat", ({firstName, userId, targetUserId})=>{
-            //We need to create a ROOM in this server with a uniqueId. 
             const roomId = getSecretRoomId(userId, targetUserId);
 
             console.log(firstName + " Joining Room : "+ roomId);
             socket.join(roomId);
         });
 
-        socket.on("sendMessage", async ({firstName, lastName, userId,targetUserId, text})=> {
+        socket.on("sendMessage", async ({ targetUserId, text })=> {
             
             //save msg to the db
             try{
+                 // Obtain details securely from authenticated session
+                const userId = socket.user._id.toString();
+                const firstName = socket.user.firstName;
+                const lastName = socket.user.lastName;
+
                 const roomId = getSecretRoomId(userId, targetUserId);
                 // console.log(firstName + " " + text);
 
@@ -53,10 +65,10 @@ const initializeSocket = (server) => {
             );
 
              if (!connectionExists) {
-            return socket.emit("error", {
+                return socket.emit("error", {
                 message: "You can only chat with connected users",
-            });
-}
+                });
+            }
 
                 let chat = await Chat.findOne(
                     {               //all the ppl in this array should be the part.

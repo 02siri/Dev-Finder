@@ -27,6 +27,8 @@ paymentRouter.post("/payment/createProduct", userAuth, async (req, res) => {
       product: product.id,
     });
 
+    const clientUrl = req.get("origin") || process.env.CLIENT_URL || "http://localhost:5173";
+
     // 3. Create Stripe Checkout Session 
     const session = await stripeInstance.checkout.sessions.create({
       payment_method_types: ["card"],
@@ -38,8 +40,8 @@ paymentRouter.post("/payment/createProduct", userAuth, async (req, res) => {
       ],
       mode: "payment",
       customer_email: emailId, // prefill email on Stripe's page
-     success_url: `${process.env.CLIENT_URL}/premium`,
-    cancel_url: `${process.env.CLIENT_URL}/premium`,
+      success_url: `${clientUrl}/premium?payment=success`,
+      cancel_url: `${clientUrl}/premium?payment=cancel`,
     });
 
     // 4. Save Payment record to DB 

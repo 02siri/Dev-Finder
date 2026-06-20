@@ -174,4 +174,17 @@ paymentRouter.get("/payment/premium/verify", userAuth, async(req,res)=>{
   return res.json({isPremium: false, user});
 });
 
+paymentRouter.post("/payment/premium/cancel", userAuth, async (req, res) => {
+  try {
+    const user = req.user;
+    user.isPremium = false;
+    user.membershipType = undefined;
+    await user.save();
+    return res.json({ message: "Membership cancelled successfully", user });
+  } catch (err) {
+    console.error(err);
+    res.status(500).send("ERROR: " + err.message);
+  }
+});
+
 module.exports = paymentRouter;

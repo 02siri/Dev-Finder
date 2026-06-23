@@ -1,6 +1,7 @@
 const socket = require("socket.io");
 const crypto = require("crypto");
 const Chat = require("../models/chat");
+const mongoose = require("mongoose");
 const ConnectionRequest = require("../models/connectionRequest");
 const { socketAuth } = require("../middlewares/auth");
 
@@ -51,18 +52,21 @@ const initializeSocket = (server) => {
                 const roomId = getSecretRoomId(userId, targetUserId);
                 // console.log(firstName + " " + text);
 
-                //Check if userId and targetUserId are friends?
-                const connectionExists = await ConnectionRequest.findOne(
-                    {$or: [{
-                    fromUserId : userId,
-                    toUserId: targetUserId,
-                    status: "accepted",
-                }, {
-                    fromUserId : targetUserId,
-                    toUserId: userId,
-                    status: "accepted",
-                },],}
-            );
+                if (!mongoose.Types.ObjectId.isValid(userId) || !mongoose.Types.ObjectId.isValid(targetUserId)) {
+                    return socket.emit("error", {
+                        message: "Invalid user details",
+                    });
+                }
+                const userObjectId = new mongoose.Types.ObjectId(userId);
+                const targetUserObjectId = new mongoose.Types.ObjectId(targetUserId);
+                // Check if userId and targetUserId are connected friends
+                const connectionExists = await ConnectionRequest.findOne({
+                    $or: [
+                        { fromUserId: userObjectId, toUserId: targetUserObjectId, status: "accepted" },
+                        { fromUserId: targetUserObjectId, toUserId: userObjectId, status: "accepted" }
+                    ]
+                });
+
 
              if (!connectionExists) {
                 return socket.emit("error", {

@@ -105,7 +105,7 @@
     - Add the userAuth middleware in APIs like : /profile, /sendConnectionRequest
     - Set the expiry of JWT token and cookies
     - Create userSchema method to getJWT
-    - Create userSchema method to compare pswds, take passwordInput 
+    - Create userSchema method to compare swds, take passwordInput 
     
 # Episode 11
     - Exploring tinder APIs

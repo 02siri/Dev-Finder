@@ -1,114 +1,103 @@
-# Dev-Finder
+# DevFinder Backend (`Dev-Finder`)
 
-This is the backend server for DevFinder, the developer matchmaking social platform. It is built as a robust Express.js API that connects to MongoDB, handles secure token authentication, processes webhooks, operates cron schedules, and coordinates WebSocket connections for real-time chat.
+This is the backend server for DevFinder, a full-stack social networking platform for software developers. It operates as an Express.js API that manages database transactions, handles token-based session authentication, coordinates WebSocket connections, and communicates with external services.
 
-## Technologies
-- **Runtime**: Node.js
-- **Framework**: Express.js
+## Tech Stack
+- **Runtime & Framework**: Node.js + Express.js
 - **Database**: MongoDB via Mongoose
-- **Real-Time**: Socket.io (WebSocket)
-- **Payments**: Stripe Node SDK
-- **Mailing**: AWS SDK v3 (Amazon SES)
-- **Scheduling**: Node-Cron + Date-fns
-- **Authentication**: JWT (JSON Web Tokens) & Cookie-Parser
+- **Real-Time Communication**: Socket.io
+- **Integrations**: Stripe SDK (Payments), AWS SDK (Amazon SES)
+- **Scheduling**: Node-Cron
 
 ---
 
 ## Architecture & Core Features
 
-### 1. Database Schema & Indexing
-- **User Schema**: Saves profiles containing `firstName`, `lastName`, `emailId`, `password`, `photoURL`, `age`, `gender`, `about`, `skills`, and subscription keys (`isPremium`, `membershipType`). Includes instance methods for JWT token signing (`getJWT`) and password verification (`validatePswd`).
-- **ConnectionRequest Schema**: Contains fields for `fromUserId` and `toUserId` along with the status (`ignored`, `interested`, `accepted`, `rejected`).
-- **Compound Index**: A compound index is defined on `fromUserId` and `toUserId` to ensure that query lookups checking for existing connection requests on either side run in \(O(1)\) index scans.
-- **Payment Schema**: Stores details of transactions with payment status (`pending`, `completed`), session IDs, product/price mappings, and metadata.
-- **Chat Schema**: Stores direct messages arrays (`senderId`, `text`, `timestamp`) mapping to a unique participants list.
+### 1. Database & Persistence
+- **Data Modeling**: Models user profiles, connection relationships, transactions, and message histories.
+- **Query Optimization**: Employs database indexes to facilitate fast lookups for relations and requests.
 
-### 2. WebSocket Real-Time Chat with Authentication
-- Socket server initializes alongside the HTTP listener.
-- **WebSocket Auth**: Uses the `socketAuth` middleware to intercept connection attempts, extract the JWT token from the cookie, verify it, and inject the authenticated user into the socket instance before matching.
-- **Room Derivation**: Generates a secure room ID using the sorted array of the two user IDs hashed with SHA-256 (`crypto.createHash("sha256")`).
-- **Authorization**: Validates that the sender and target receiver have an active `accepted` status in `ConnectionRequest` before persisting or broadcasting messages.
+### 2. WebSocket Real-Time Chat
+- **Secure Sessions**: Validates cookies to authenticate incoming WebSocket connections.
+- **Channel Access**: Derives chat channels programmatically and enforces active connection requirements before allowing messages to route between users.
 
 ### 3. Stripe Integration & Webhooks
-- **Session Creation**: `/payment/createProduct` creates a Stripe Product and Price dynamically based on selected membership types, saves a `pending` payment record, and returns a checkout session URL.
-- **Signature Verification**: Stripe webhook endpoint `/payment/webhook` receives webhook requests and verifies signatures using `stripeInstance.webhooks.constructEvent()` to protect against spoofing.
-- **Event Handler**: On `checkout.session.completed`, the system updates the `Payment` document status to `completed` and flags the user account as `isPremium = true` with their chosen tier.
+- **Session Billing**: Generates dynamic Stripe billing links and directs users to payment portals.
+- **Event Handling**: Listens to Stripe webhook signals securely and updates premium memberships on successful subscription events.
 
-### 4. Amazon SES Daily Email Scheduler
-- A node-cron job is scheduled daily (`0 8 * * *`) to scan for connection requests created within the last 24 hours.
-- Uses `date-fns` (`subDays`, `startOfDay`, `endOfDay`) to locate target timestamps.
-- Aggregates unique receivers, queries their emails, and fires personalized request notifications using the AWS SES client (`@aws-sdk/client-ses`).
+### 4. Notification Scheduler
+- **Daily Digests**: Runs scheduled checks to gather recently created request notifications.
+- **Email Dispatch**: Sends summarized update digests via Amazon Simple Email Service (SES).
 
 ---
 
 ## API Reference
 
-### Auth Routes (`/auth/*`)
-- `POST /signup`: Validates inputs, hashes password using bcrypt, stores user, cookies a JWT, and returns user details.
-- `POST /login`: Validates credentials, verifies bcrypt hash, returns cookies containing JWT.
-- `POST /logout`: Clears the JWT cookie immediately.
+### Auth
+- `POST /auth/signup` - Register a new user profile
+- `POST /auth/login` - Authenticate credentials and establish session cookie
+- `POST /auth/logout` - Clear session authentication
 
-### Profile Routes (`/profile/*`)
-- `GET /profile/view`: Returns details of the logged-in user.
-- `PATCH /profile/edit`: Updates editable user details (e.g., photo URL, skills, age).
-- `PATCH /profile/changePassword`: Validates strength and updates the password hash.
+### Profile
+- `GET /profile/view` - Retrieve logged-in user profile details
+- `PATCH /profile/edit` - Update profile configurations
+- `PATCH /profile/changePassword` - Change password securely
 
-### Connection Request Routes (`/request/*`)
-- `POST /request/send/:status/:toUserId`: Sends request. Status must be `ignored` or `interested`.
-- `POST /request/review/:status/:requestId`: Reviews received request. Status must be `accepted` or `rejected`.
+### Connections & Requests
+- `POST /request/send/:status/:toUserId` - Send connection request (Interested/Ignored)
+- `POST /request/review/:status/:requestId` - Review incoming connection request (Accept/Reject)
+- `GET /user/requests/received` - Fetch pending connection requests
+- `GET /user/connections` - Fetch accepted connections
 
-### User Queries & Feed Routes (`/user/*` and `/feed`)
-- `GET /user/requests/received`: Fetches pending requests received by the current user.
-- `GET /user/connections`: Retrieves all accepted friends.
-- `GET /feed?page=1&limit=10`: Fetches other user cards, excluding own, connections, ignored, or pending users. Supports server-side pagination with skip/limit formula `(page - 1) * limit`.
+### Feed & Chat
+- `GET /feed` - Fetch candidate card feed for discovery
+- `GET /chat/:targetUserId` - Retrieve paginated historical chat logs
 
-### Chat History Route (`/chat/*`)
-- `GET /chat/:targetUserId?page=1&limit=10`: Paginated access to historical direct messages. Returns the slice of messages along with `hasMore` pagination tokens.
-
-### Stripe Membership Routes (`/payment/*`)
-- `POST /payment/createProduct`: Generates Stripe checkout session.
-- `POST /payment/webhook`: Processes payment updates from Stripe.
-- `GET /payment/premium/verify`: Confirms user's premium status.
-- `POST /payment/premium/cancel`: Downgrades user to a free account.
-
----
-
-## Environment Configuration
-Create a `.env` file in the root of the backend folder:
-```env
-PORT=7777
-CLIENT_URL="https://dev-finder.online"
-DB_CONNECTION_SECRET="mongodb+srv://..."
-JWT_SECRET="your_jwt_signing_key"
-AWS_ACCESS_KEY="your_aws_access_key"
-AWS_SECRET_KEY="your_aws_secret_key"
-STRIPE_SECRET_KEY="your_stripe_secret_key"
-STRIPE_WEBHOOK_SECRET="your_stripe_webhook_secret"
-```
+### Payments
+- `POST /payment/createProduct` - Generate checkout session URLs
+- `POST /payment/webhook` - Handle Stripe webhook events
+- `GET /payment/premium/verify` - Confirm user's premium status
+- `POST /payment/premium/cancel` - Cancel active subscription plan
 
 ---
 
 ## Running Locally
 
-### Development
+### 1. Installation
+Install dependencies inside the backend folder:
 ```bash
 npm install
+```
+
+### 2. Configure Environment
+Set up your required environment variables (port, database connection string, JWT secret, AWS credentials, and Stripe keys) in a local `.env` file at the root of this folder.
+
+### 3. Run Server
+Start the development server:
+```bash
 npm run dev
 ```
 
-### Production
-```bash
-npm install
-npm start
-```
+The backend server defaults to port `7777`.
 
 ---
 
 ## Deployment & Process Management
-The application runs on AWS EC2 behind Nginx. 
+The application is deployed on an **AWS EC2 Instance** (Ubuntu) using Nginx and PM2.
 
-### Process Management with PM2
-To run the server continuously in the background:
+### Step 1: Connect to your EC2 Instance
+Access your virtual machine via SSH:
+```bash
+ssh -i "your-key-file.pem" ubuntu@your-ec2-ip-address
+```
+
+### Step 2: Set Up Environment & Clone
+1. Install system requirements (Node.js, PM2, and Nginx).
+2. Clone the backend repository to your directory.
+3. Configure local environment variables in a `.env` file.
+
+### Step 3: Manage Application with PM2
+To run and monitor the server continuously in the background:
 ```bash
 # Start backend server
 pm2 start npm --name "dev-finder-backend" -- start
@@ -116,27 +105,13 @@ pm2 start npm --name "dev-finder-backend" -- start
 # List active processes
 pm2 list
 
-# View logs in real-time
+# Monitor logs in real-time
 pm2 logs
 
-# Stop or restart processes
+# Restart process
 pm2 restart dev-finder-backend
-pm2 stop dev-finder-backend
 ```
 
-### Nginx Reverse Proxy Config
-Insert this block under the main server directive in `/etc/nginx/sites-available/default`:
-```nginx
-server_name dev-finder.online;
-
-location /api/ {
-    proxy_pass http://localhost:7777/;
-    proxy_http_version 1.1;
-
-    proxy_set_header Upgrade $http_upgrade;
-    proxy_set_header Connection 'upgrade';
-    proxy_set_header Host $host;
-    proxy_cache_bypass $http_upgrade;
-}
-```
-This maps requests targeting `https://dev-finder.online/api/*` directly to `http://localhost:7777/*`.
+### Step 4: Reverse Proxy Configuration
+Configure your Nginx server block to forward incoming API requests to the local backend port:
+- Standard traffic targeting `/api/*` is routed directly to the backend application running on `http://localhost:7777`.

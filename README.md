@@ -1,3 +1,9 @@
+<img width="2880" height="1800" alt="DevFinder" src="https://github.com/user-attachments/assets/ab77d36c-8002-4db6-96b6-d02eab91175c" />
+
+Live app: https://dev-finder.online
+
+Walkthrough video: https://drive.google.com/file/d/1qvWsZd2BNCEeFTG0J9zBoRXWW4U5UUlt/view?usp=sharing
+
 # DevFinder Backend
 
 This is the backend server for DevFinder, a full-stack social networking platform for software developers. It operates as an Express.js API that manages database transactions, handles token-based session authentication, coordinates WebSocket connections, and communicates with external services.

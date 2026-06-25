@@ -1,4 +1,4 @@
-# DevFinder Backend (`Dev-Finder`)
+# DevFinder Backend
 
 This is the backend server for DevFinder, a full-stack social networking platform for software developers. It operates as an Express.js API that manages database transactions, handles token-based session authentication, coordinates WebSocket connections, and communicates with external services.
 

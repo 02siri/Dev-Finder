@@ -56,13 +56,20 @@ const data = await connectionRequest.save();
 
 console.log("Connection request saved");
 
-// const emailRes = await sendEmail.run(
-//    req.user.firstName + " is waiting for you!",
-//  req.user.firstName + " is " + status + " in you!",
-// toUser.emailId
-// );
-
-// console.log("EMAIL RESPONSE:", emailRes);
+      if (status === "interested") {
+         try {
+            const senderName = req.user.firstName + " " + (req.user.lastName || "");
+            const recipientEmail = toUser.emailId;
+            await sendEmail.run(
+               "New connection request from " + senderName,
+               senderName + " has sent you a connection request on DevFinder!",
+               recipientEmail
+            );
+            console.log("email sent");
+         } catch (emailErr) {
+            console.error("Failed to send instant email notification:", emailErr);
+         }
+      }
 
       res.json({
          message: req.user.firstName + " " + status + " " + toUser.firstName,

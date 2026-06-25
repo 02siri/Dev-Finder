@@ -20,20 +20,62 @@ cron.schedule("0 8 * * *", async ()=>{
             },
         }).populate("fromUserId toUserId");
 
-        const listOfEmails = [...new Set(pendingRequests.map(req => req.toUserId.emailId))];
+        // Group requests by recipient email address
+        const emailToRequestsMap = {};
+        for (const req of pendingRequests) {
+            if (req.toUserId && req.toUserId.emailId) {
+                const email = req.toUserId.emailId;
+                if (!emailToRequestsMap[email]) {
+                    emailToRequestsMap[email] = [];
+                }
+                emailToRequestsMap[email].push(req);
+            }
+        }
 
-        console.log(listOfEmails);
-        for(const email of listOfEmails){
-           try{
-            const emailRes = await sendEmail.run(
-              "New friend requests pending for " + email,
-              "You have friend requests pending!",
-              email
-            );
-            console.log(emailRes);
-           }catch(err){
-            console.error(err);
-           } 
+        console.log("Found requests grouped by email:", Object.keys(emailToRequestsMap));
+
+        for (const email of Object.keys(emailToRequestsMap)) {
+            try {
+                const requests = emailToRequestsMap[email];
+                
+                // Get the unique sender names
+                const senderNames = [
+                    ...new Set(
+                        requests
+                            .map(req => {
+                                const fromUser = req.fromUserId;
+                                if (fromUser) {
+                                    const firstName = fromUser.firstName || "";
+                                    const lastName = fromUser.lastName || "";
+                                    return (firstName + " " + lastName).trim();
+                                }
+                                return "Someone";
+                            })
+                            .filter(name => name.length > 0)
+                    )
+                ];
+
+                const recipientName = requests[0].toUserId.firstName || "there";
+                
+                let subject = "";
+                let body = "";
+
+                if (senderNames.length === 1) {
+                    subject = "New connection request pending from " + senderNames[0];
+                    body = "Hi " + recipientName + ", you have a pending connection request from " + senderNames[0] + " on DevFinder!";
+                } else if (senderNames.length > 1) {
+                    subject = "You have " + senderNames.length + " pending connection requests";
+                    body = "Hi " + recipientName + ", you have pending connection requests from: " + senderNames.join(", ") + " on DevFinder!";
+                } else {
+                    subject = "New friend requests pending";
+                    body = "Hi " + recipientName + ", you have pending friend requests on DevFinder!";
+                }
+
+                const emailRes = await sendEmail.run(subject, body, email);
+                console.log("Cron job sent email to", email, "response:", emailRes);
+            } catch (err) {
+                console.error("Failed to send cron email to " + email, err);
+            }
         }
         
     }catch(err){
